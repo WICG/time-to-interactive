@@ -1,11 +1,9 @@
 Time to Interactive Explainer
 ============================
 
-Web developers require more information on page load performance in the wild. No single moment in time completely captures the "loading experience". To give developers insight into the loading experience, we propose a set of key progress metrics to capture the series of key moments during pageload which developers care about. Time to Interactive (TTI) is the last and most important of these key moments, following First Paint (FP) and First Contentful Paint (FCP).
+Web developers require more information on page load performance in the wild. No single moment in time completely captures the "loading experience". To give developers insight into the loading experience, we propose a set of key progress metrics to capture the series of key moments during pageload which developers care about. Time to Interactive (TTI) is the last and most important of these key moments, following [First Paint](https://w3c.github.io/paint-timing/#first-paint) (FP) and [First Contentful Paint](https://w3c.github.io/paint-timing/#first-contentful-paint) (FCP).
 
 Time to Interactive (TTI) is a page load performance metric that measures how long it takes for a web page to become interactive, which is defined as the point where: 
-
-
 
 1.  The page has displayed useful content
 1.  Event handlers are registered for most visible page elements
@@ -18,15 +16,41 @@ Web developers often use the Onload signal to measure this today, but Onload cor
 
 Many sites optimize content visibility at the expense of interactivity. We often see multi-second delays between paint metrics and interactivity. We want to:
 
-
-
 *   Motivate developers to ensure their sites are interactive quickly
 *   Incentivize developers to eliminate, break up, or front-load their long tasks
 
 
+## API
+
+We propose adding a `PerformanceInteractiveTiming` interface.
+
+```javascript
+interface PerformanceInteractiveTiming : PerformanceEntry {};
+```
+
+* The name attribute must return "interactive"
+* The entryType attribute must return "interactive".
+* The startTime attribute must return a DOMHighResTimeStamp of when the page became interactive.
+* The duration attribute must return 0.
+
+```javascript
+var observer = new PerformanceObserver(function(list) {
+  var perfEntries = list.getEntries();
+  for (var i = 0; i < perfEntries.length; i++) {
+     // Process entries
+     // report back for analytics and monitoring
+     // There should be exactly one entry if the page already reached
+     // Page Interactive, otherwise there should be none.
+  }
+});
+
+// Register observer for Time to Interactive timing notifications.
+observer.observe({entryTypes: ["interactive"]});
+```
+
 ## Definition
 
-Detecting (1) and (2) above in full generality is impossible, so we use a combination of observing main thread and network activity and listening to signals like DomContentLoadedEnd and FirstContentfulPaint for this metric. At a high level, the current definition looks for a big enough time window on the browsing context event loop such that the window contains no long tasks (so we know that the event loop will be ready to ready to user input quickly), and the window contains a five second sub-window of network quiet (so we know that the page is mostly done loading resources and some newly downloaded resource is unlikely to set off heavy processing.) 
+Detecting when the page has displayed useful content and event listeners are registered for most visible elements in full generality is impossible, so we use a combination of observing main thread and network activity and listening to signals like DomContentLoadedEnd and FirstContentfulPaint for this metric. At a high level, the current definition looks for a big enough time window on the browsing context event loop such that the window contains no long tasks (so we know that the event loop will be ready to ready to user input quickly), and the window contains a five second sub-window of network quiet (so we know that the page is mostly done loading resources and some newly downloaded resource is unlikely to set off heavy processing.) 
 
 The precise algorithmic definition is as follows:
 
@@ -51,27 +75,18 @@ Schematic diagram of the definition:
 
 ### Planned changes to the definition
 
-
-
 *   We cannot use First Meaningful Paint as lower bound since that is not standardized yet. Other contenders for lower bound include:
     *   First Contentful Paint
     *   Dom Content Loaded
-    *   Developer's instrumenting when they're done adding event listeners
+    *   Developers instrumenting when they're done adding event listeners
 *   Update the network quiet heuristic
     *   Currently we only look at the number of simultaneous network requests. We can do better by paying attention to resource type and contents.
 
-
 ## Frequently Asked Questions
-
-
 
 **Why do we need a network quiet heuristic? Is it not enough to look at main thread activity plus DOMContentLoaded and First Meaningful/Contentful Paint?**
 
-
 Critical javascript resource loads (resources needed to make the web page interactive and resources that will set off long tasks) often start after FMP/DCL and take more than 5 seconds to load, especially on slow networks,  We need a signal for when we are mostly done loading subresources, which our network quiet heuristic provides.
-
-
-
 
 **Doesn't TTI fail with a single long network request containing the whole app bundle?**
 
@@ -83,29 +98,7 @@ We cannot _detect_ TTI until network is quiet, but the actual TTI value is alway
 
 
 
-## Usage
-
-
-```javascript
-var observer = new PerformanceObserver(function(list) {
-  var perfEntries = list.getEntries();
-  for (var i = 0; i < perfEntries.length; i++) {
-     // Process entries
-     // report back for analytics and monitoring
-     // There should be exactly one entry if the page already reached
-     // Page Interactive, otherwise there should be none.
-  }
-});
-
-// Register observer for Time to Interactive timing notifications.
-observer.observe({entryTypes: ["timetointeractive"]});
-```
-
-
-
 ## Things to note
-
-
 
 *   TTI is not a real-time metric. We have to wait at least 5 seconds after the page actually becomes interactive before we can report it.
 *   Unlike the Onload event, it is not enough for a page to load all resources and initialize all event handlers to reach TTI. The page has to consistently keep all its main thread activity under the 50ms budget. 
