@@ -19,6 +19,10 @@ Many sites optimize content visibility at the expense of interactivity. We often
 *   Motivate developers to ensure their sites are interactive quickly
 *   Incentivize developers to eliminate, break up, or front-load their long tasks
 
+We believe that the best way to accomplish these objectives is for the metric to:
+
+* Correlate reasonably closely with an intuitive definition of how interactive a page is.
+* Behave the same in the lab and in the wild.
 
 ## API
 
