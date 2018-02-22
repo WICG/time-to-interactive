@@ -67,7 +67,8 @@ The precise algorithmic definition is as follows:
         *   In this case, reset the window start time to the end of this long task and continue growing the window.
     *   Or, last 5 seconds of the window is _network quiet_.
         *   Go to next step in this case.
-        *   Currently we call a time interval network quiet if it contains a maximum of two simultaneous network request at any given time. Forgiving up to two requests allows us to still reach network quiescence on sites that have long running network requests, for example to perform long polling.
+        *   Currently we call a time interval network quiet if it contains a maximum of two simultaneous resource requests at any given time. We exclude failed resource requests and resource requests that are not made with the GET HTTP method and Forgiving up to two requests allows us to still reach network quiescence on sites that have long running network requests, for example to perform long polling.
+        * Note that the window is at least 5 seconds long at this point and has no task with duration > 50ms.
 *   Report the start time of the window at TTI.
     *   If DOMContentLoadedEnd occurs after the start of the window, report that as TTI.
         *   We do not want to consider a page interactive before document finishes parsing. 
@@ -94,13 +95,32 @@ Critical javascript resource loads (resources needed to make the web page intera
 
 **Doesn't TTI fail with a single long network request containing the whole app bundle?**
 
-It does. We see problems here much more frequently with poor network connections, but it is a problem in general. We're working on addressing this by improving the network idle heuristic. We don't think the quality issues are bad enough to block shipping TTI, given the current urgency. 
+In theory it does, but in the wild this scenario is extremely rare. There are usually either enough parallel network requests, or the page does not reach First Meaningful Paint before that the single long network request. This scenario is more common in development environments where the resource bundle is not properly split. We recommend performance tools provide the ability to specify a custom lower bound in this case to get around this issue.
 
 **Does TTI block until network is quiet?**
 
 We cannot _detect_ TTI until network is quiet, but the actual TTI value is always at the end of a long task. For example, if there is a page where the last long task ends at 5s, but it downloads 50 images afterwards that take 20 more seconds to finish downloading, we may not be able to detect TTI until around 25s when most of those images are finished downloading, but the TTI value will still be 5s. 
 
+**Why are we excluding non-GET requests?** 
+The point of the network quiet heuristic is to block detecting TTI until the page has fetched all the critical resources. Non-GET requests, like POST, are almost never used to fetch resources. During page load, their purpose is usually to report back analytis data, so it is safe to exclude them.
 
+**Why do we take the max of DCLEnd and the stat of quiet window, as opposed to simply stating the max of FMP, DCLEnd, and the start of quiet window?**
+
+They're subtly different. The Imagine this scenario: 
+```
+FMP      DCLEnd     Long Task      
+
+|        |          |
+
+|<- 2 -> | <-  4  ->|
+
+|<----6 seconds---->|
+```
+
+With taking max(FMP, DCLEnd) as lower bound, TTI will fire after the long task. 
+If we use max(DCLEnd, TTI) at the end instead, TTI will fire at DCLEnd. 
+
+We decided in this particular case, it is more appropriate to declare TTI at DCLEnd. 
 
 ## Things to note
 
