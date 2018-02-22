@@ -67,8 +67,8 @@ The precise algorithmic definition is as follows:
         *   In this case, reset the window start time to the end of this long task and continue growing the window.
     *   Or, last 5 seconds of the window is _network quiet_.
         *   Go to next step in this case.
-        *   Currently we call a time interval network quiet if it contains a maximum of two simultaneous resource requests at any given time. We exclude failed resource requests and resource requests that are not made with the GET HTTP method and Forgiving up to two requests allows us to still reach network quiescence on sites that have long running network requests, for example to perform long polling.
-        * Note that the window is at least 5 seconds long at this point and has no task with duration > 50ms.
+        *   Currently we call a time interval network quiet if it contains a maximum of two simultaneous resource requests at any given time. We exclude failed resource requests and resource requests that are not made with the GET HTTP method. Forgiving up to two requests allows us to still reach network quiescence on sites that have long running network requests, for example to perform long polling.
+        * Note that since we reset the window when we encounter a long task, at this point the window is at least 5 seconds long and contains no task on the browsing context event loop > 50ms in addition to being network quiet.
 *   Report the start time of the window at TTI.
     *   If DOMContentLoadedEnd occurs after the start of the window, report that as TTI.
         *   We do not want to consider a page interactive before document finishes parsing. 
